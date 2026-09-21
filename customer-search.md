@@ -30,3 +30,15 @@ The customer-search feature allows users to search for customers using customer 
 
 \- Return a clear message when no customer is found
 
+\## Validation Rules
+
+
+
+\- Search input must not be empty
+
+\- Customer ID must contain valid characters
+
+\- Email searches should use a valid email format
+
+\- Display a "Customer not found" message when there is no match
+

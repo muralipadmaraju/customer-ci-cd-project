@@ -1,0 +1,41 @@
+services:
+  app:
+    image: ${APP_IMAGE}
+    container_name: ${APP_CONTAINER}
+    restart: unless-stopped
+    environment:
+      APP_VERSION: ${VERSION}
+      APP_ENVIRONMENT: ${ENVIRONMENT}
+      DB_HOST: ${DB_CONTAINER}
+      POSTGRES_DB: customer
+      POSTGRES_USER: customer
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${HOST_PORT}:8080"
+    networks: [appnet]
+  db:
+    image: postgres:16-alpine
+    container_name: ${DB_CONTAINER}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: customer
+      POSTGRES_USER: customer
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${DB_VOLUME}:/var/lib/postgresql/data
+    networks: [appnet]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer -d customer"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+networks:
+  appnet:
+    name: ${NETWORK}
+    driver: bridge
+volumes:
+  ${DB_VOLUME}:
+    name: ${DB_VOLUME}

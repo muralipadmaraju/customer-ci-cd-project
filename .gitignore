@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+deploy/compose.yml
+*.log
+.idea/
+.vscode/

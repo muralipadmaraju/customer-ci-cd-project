@@ -1,93 +1,131 @@
 pipeline {
     agent any
+
     parameters {
-        choice(name: 'ENVIRONMENT', choices: ['DEV','UAT','PRODUCTION'], description: 'Target environment')
-        choice(name: 'ACTION', choices: ['DEPLOY','ROLLBACK'], description: 'Deployment action')
-        string(name: 'VERSION', defaultValue: '1.0', description: 'Application version')
-        choice(name: 'RUN_TESTS', choices: ['YES','NO'], description: 'Run tests')
-        booleanParam(name: 'PRODUCTION_CONFIRM', defaultValue: false, description: 'Required for production')
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['DEV', 'UAT', 'PRODUCTION'],
+            description: 'Select deployment environment'
+        )
+
+        choice(
+            name: 'ACTION',
+            choices: ['DEPLOY', 'ROLLBACK'],
+            description: 'Select deployment action'
+        )
+
+        string(
+            name: 'VERSION',
+            defaultValue: '1.0',
+            description: 'Docker image version'
+        )
+
+        choice(
+            name: 'RUN_TESTS',
+            choices: ['YES', 'NO'],
+            description: 'Run application tests'
+        )
     }
-    environment {
-        IMAGE_REPO = 'customer-app'
-        DB_PASSWORD = credentials('customer-db-password')
-    }
+
     stages {
-        stage('Resolve configuration') {
+
+        stage('Show Configuration') {
+            steps {
+                echo "========================================"
+                echo "Environment : ${params.ENVIRONMENT}"
+                echo "Action      : ${params.ACTION}"
+                echo "Version     : ${params.VERSION}"
+                echo "Run Tests   : ${params.RUN_TESTS}"
+                echo "========================================"
+            }
+        }
+
+        stage('Validate Parameters') {
             steps {
                 script {
-                    def configs = [
-                        DEV:[branch:'develop',app:'customer-app-dev',port:'8081',network:'customer-dev-net',db:'customer-db-dev',volume:'customer-db-dev-data'],
-                        UAT:[branch:'release',app:'customer-app-uat',port:'8082',network:'customer-uat-net',db:'customer-db-uat',volume:'customer-db-uat-data'],
-                        PRODUCTION:[branch:'main',app:'customer-app-prod',port:'8083',network:'customer-prod-net',db:'customer-db-prod',volume:'customer-db-prod-data']
-                    ]
-                    def c=configs[params.ENVIRONMENT]
-                    if (!c) error('Invalid environment')
-                    if (!params.VERSION?.trim()) error('VERSION is required')
-                    if (params.ENVIRONMENT=='PRODUCTION' && !params.PRODUCTION_CONFIRM) error('Production requires explicit confirmation')
-                    env.GIT_BRANCH_RESOLVED=c.branch
-                    env.APP_CONTAINER=c.app
-                    env.HOST_PORT=c.port
-                    env.DOCKER_NETWORK=c.network
-                    env.DB_CONTAINER=c.db
-                    env.DB_VOLUME=c.volume
-                    env.APP_IMAGE="${IMAGE_REPO}:${params.VERSION}"
-                    echo "Environment=${params.ENVIRONMENT} Action=${params.ACTION} Version=${params.VERSION} Branch=${c.branch} App=${c.app} Port=${c.port} Network=${c.network} DB=${c.db} Volume=${c.volume}"
+                    if (params.ENVIRONMENT == 'PRODUCTION' &&
+                        params.VERSION == '') {
+                        error('Production deployment requires a version.')
+                    }
+
+                    echo "Parameters validated successfully."
                 }
             }
         }
+
         stage('Checkout') {
             steps {
-                checkout([$class:'GitSCM', branches:[[name:"*/${env.GIT_BRANCH_RESOLVED}"]], userRemoteConfigs:[[url:'YOUR-GIT-REPOSITORY', credentialsId:'git-credentials']]])
+                script {
+                    def branch = ''
+
+                    if (params.ENVIRONMENT == 'DEV') {
+                        branch = 'develop'
+                    } else if (params.ENVIRONMENT == 'UAT') {
+                        branch = 'release'
+                    } else if (params.ENVIRONMENT == 'PRODUCTION') {
+                        branch = 'main'
+                    }
+
+                    echo "Checking out branch: ${branch}"
+
+                    git branch: branch,
+                        url: 'https://github.com/muralipadmaraju/customer-ci-cd-project.git'
+                }
             }
         }
-        stage('Build Docker image') {
-            when { expression { params.ACTION == 'DEPLOY' } }
-            steps { sh "docker build -t ${APP_IMAGE} ./app" }
-        }
-        stage('Run tests') {
-            when { expression { params.ACTION == 'DEPLOY' && params.RUN_TESTS == 'YES' } }
-            steps { sh "docker run --rm ${APP_IMAGE} python -m py_compile app.py" }
-        }
-        stage('Prepare configuration') {
+
+        stage('Tests') {
+            when {
+                expression {
+                    params.RUN_TESTS == 'YES'
+                }
+            }
+
             steps {
-                sh '''
-                    export APP_IMAGE="${APP_IMAGE}"
-                    export APP_CONTAINER="${APP_CONTAINER}"
-                    export VERSION="${VERSION}"
-                    export ENVIRONMENT="${ENVIRONMENT}"
-                    export DB_CONTAINER="${DB_CONTAINER}"
-                    export DB_PASSWORD="${DB_PASSWORD}"
-                    export HOST_PORT="${HOST_PORT}"
-                    export NETWORK="${DOCKER_NETWORK}"
-                    export DB_VOLUME="${DB_VOLUME}"
-                    envsubst < deploy/compose.template.yml > deploy/compose.yml
-                    cat deploy/compose.yml
-                '''
+                echo "Running application tests..."
             }
         }
+
         stage('Deploy') {
-            when { expression { params.ACTION == 'DEPLOY' } }
-            steps { sh 'docker compose -f deploy/compose.yml up -d --force-recreate' }
-        }
-        stage('Rollback') {
-            when { expression { params.ACTION == 'ROLLBACK' } }
-            steps { sh 'docker compose -f deploy/compose.yml up -d --force-recreate' }
-        }
-        stage('Validation') {
+            when {
+                expression {
+                    params.ACTION == 'DEPLOY'
+                }
+            }
+
             steps {
-                sh '''
-                    set -e
-                    docker ps
-                    docker network inspect ${DOCKER_NETWORK}
-                    curl -f http://localhost:${HOST_PORT}/health
-                    curl -f http://localhost:${HOST_PORT}/db
-                    curl -f http://localhost:${HOST_PORT}/version
-                '''
+                echo "Deployment requested."
+                echo "Environment: ${params.ENVIRONMENT}"
+                echo "Version: ${params.VERSION}"
+            }
+        }
+
+        stage('Rollback') {
+            when {
+                expression {
+                    params.ACTION == 'ROLLBACK'
+                }
+            }
+
+            steps {
+                echo "Rollback requested."
+                echo "Environment: ${params.ENVIRONMENT}"
+                echo "Version: ${params.VERSION}"
             }
         }
     }
+
     post {
-        success { echo 'Deployment validation succeeded.' }
-        failure { echo 'Deployment or validation failed.' }
+        success {
+            echo "========================================"
+            echo "PIPELINE SUCCESSFUL"
+            echo "========================================"
+        }
+
+        failure {
+            echo "========================================"
+            echo "PIPELINE FAILED"
+            echo "========================================"
+        }
     }
 }

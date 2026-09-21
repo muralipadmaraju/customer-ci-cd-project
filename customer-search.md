@@ -42,3 +42,27 @@ The customer-search feature allows users to search for customers using customer 
 
 \- Display a "Customer not found" message when there is no match
 
+\## Search Result Behavior
+
+
+
+When a customer is found, display:
+
+
+
+\- Customer ID
+
+\- Customer Name
+
+\- Email
+
+\- Customer Status
+
+
+
+When no customer is found, display:
+
+
+
+Customer not found.
+

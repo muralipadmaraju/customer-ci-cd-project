@@ -106,7 +106,7 @@ pipeline {
 
             steps {
                 bat """
-                    docker build -t ${IMAGE_NAME}:${params.VERSION} .
+                    docker build -t ${IMAGE_NAME}:${params.VERSION} ./app
                 """
             }
         }
@@ -165,11 +165,11 @@ pipeline {
                       --name ${APP_CONTAINER} ^
                       --network ${NETWORK} ^
                       -p ${PORT}:8080 ^
-                      -e ENVIRONMENT=${params.ENVIRONMENT} ^
+                      -e APP_VERSION=${params.VERSION} ^`r`n                      -e APP_ENVIRONMENT=${params.ENVIRONMENT} ^
                       -e DB_HOST=${DB_CONTAINER} ^
-                      -e DB_NAME=customerdb ^
-                      -e DB_USER=customer ^
-                      -e DB_PASSWORD=customer123 ^
+                      -e POSTGRES_DB=customerdb ^
+                      -e POSTGRES_USER=customer ^
+                      -e POSTGRES_PASSWORD=customer123 ^
                       ${IMAGE_NAME}:${params.VERSION}
                 """
             }
@@ -218,11 +218,11 @@ pipeline {
                       --name ${APP_CONTAINER} ^
                       --network ${NETWORK} ^
                       -p ${PORT}:8080 ^
-                      -e ENVIRONMENT=${params.ENVIRONMENT} ^
+                      -e APP_VERSION=${params.VERSION} ^`r`n                      -e APP_ENVIRONMENT=${params.ENVIRONMENT} ^
                       -e DB_HOST=${DB_CONTAINER} ^
-                      -e DB_NAME=customerdb ^
-                      -e DB_USER=customer ^
-                      -e DB_PASSWORD=customer123 ^
+                      -e POSTGRES_DB=customerdb ^
+                      -e POSTGRES_USER=customer ^
+                      -e POSTGRES_PASSWORD=customer123 ^
                       ${IMAGE_NAME}:${params.VERSION}
                 """
 
